@@ -47,10 +47,16 @@ import com.example.materialfilexplorer.ui.theme.MaterialFileXplorerTheme
 import kotlinx.coroutines.launch
 
 
-private const val THEME_PREFS = "theme_prefs"
-private const val IS_DARK_THEME = "is_dark_theme"
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        const val THEME_PREFS = "theme_prefs"
+        const val IS_DARK_THEME = "is_dark_theme"
+    }
+    private val sharedPreferences by lazy {
+        getSharedPreferences(THEME_PREFS, Context.MODE_PRIVATE)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val sharedPref = getSharedPreferences(THEME_PREFS, Context.MODE_PRIVATE)
@@ -76,7 +82,7 @@ class MainActivity : ComponentActivity() {
 fun customShape(): Shape {
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-    val density = LocalDensity.current.density
+    LocalDensity.current.density
 
     val widthPx = with(LocalDensity.current) { screenWidth.toPx() }
     val heightPx = with(LocalDensity.current) { screenHeight.toPx() }
