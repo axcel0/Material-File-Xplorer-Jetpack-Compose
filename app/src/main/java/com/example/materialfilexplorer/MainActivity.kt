@@ -1,233 +1,290 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.example.materialfilexplorer
 
-import android.content.Context
+import androidx.compose.material.ListItem
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
-import android.util.Log
+import android.os.Environment
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.*
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import com.example.materialfilexplorer.ui.theme.MaterialFileXplorerTheme
 import kotlinx.coroutines.launch
-
-
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 class MainActivity : ComponentActivity() {
+
     companion object {
-        const val THEME_PREFS = "theme_prefs"
-        const val IS_DARK_THEME = "is_dark_theme"
-    }
-    private val sharedPreferences by lazy {
-        getSharedPreferences(THEME_PREFS, Context.MODE_PRIVATE)
+        private const val PREFERENCE_THEME = "preference_theme"
+        private const val DARK_MODE_PREF = "dark_mode"
     }
 
+    private val sharedPreferences by lazy {
+        getSharedPreferences(PREFERENCE_THEME, MODE_PRIVATE)
+    }
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        return if (keyCode == KeyEvent.KEYCODE_BACK) {
+            val currentDirectory = fileViewModel.currentDirectory.value
+            if (currentDirectory?.parentFile != null) {
+                fileViewModel.loadFiles(currentDirectory.parentFile!!)
+            } else {
+                finish()
+            }
+            true
+        } else {
+            super.onKeyDown(keyCode, event)
+        }
+    }
+    private val fileViewModel: FileViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val sharedPref = getSharedPreferences(THEME_PREFS, Context.MODE_PRIVATE)
-        var isDarkTheme by mutableStateOf(sharedPref.getBoolean(IS_DARK_THEME, true))
+        onBackPressedDispatcher.addCallback(this) {
+            val currentDirectory = fileViewModel.currentDirectory.value
+            if (currentDirectory?.parentFile != null) {
+                fileViewModel.loadFiles(currentDirectory.parentFile!!)
+            } else {
+                finish()
+            }
+        }
+        val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            if (permissions.all { it.value }) {
+                fileViewModel.loadFiles(Environment.getExternalStorageDirectory())
+            } else {
+                Toast.makeText(this, "Permissions denied", Toast.LENGTH_SHORT).show()
+            }
+        }
 
+        requestPermissionLauncher.launch(arrayOf(
+            android.Manifest.permission.READ_EXTERNAL_STORAGE,
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ))
         setContent {
-
+            var isDarkTheme by remember { mutableStateOf(sharedPreferences.getBoolean(DARK_MODE_PREF, false)) }
+            val onDarkModeChange : (Boolean) -> Unit = {
+                isDarkTheme = it
+                sharedPreferences.edit().putBoolean(DARK_MODE_PREF, it).apply()
+            }
             MaterialFileXplorerTheme(isInDarkTheme = isDarkTheme) {
-                LaunchedEffect(isDarkTheme) {
-                    with(sharedPref.edit()) {
-                        putBoolean("is_dark_theme", isDarkTheme)
-                        apply()
-                    }
-                }
-                MainScreen(isDarkTheme) {
-                    isDarkTheme = it
-                }
+                MainContent(isDarkTheme, onDarkModeChange, fileViewModel)
             }
         }
     }
-}
-@Composable
-fun customShape(): Shape {
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-    LocalDensity.current.density
 
-    val widthPx = with(LocalDensity.current) { screenWidth.toPx() }
-    val heightPx = with(LocalDensity.current) { screenHeight.toPx() }
-
-    val width = widthPx * 0.25f // 25% of screen width
-
-    return object : Shape {
-        override fun createOutline(
-            size: Size,
-            layoutDirection: LayoutDirection,
-            density: Density
-        ): Outline {
-            return Outline.Rectangle(Rect(0f, 0f, width, heightPx))
+    @Composable
+    fun MainContent(isDarkTheme: Boolean, onDarkModeChange: (Boolean) -> Unit = {}, fileViewModel: FileViewModel) {
+        val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+        ModalNavigationDrawer(
+            drawerContent = { DrawerSheet(drawerState) },
+            drawerState = drawerState,
+        ) {
+            Scaffold (
+                topBar = { TopBar(isDarkTheme, onDarkModeChange, drawerState) },
+                content = { innerPadding -> Content(innerPadding) },
+            )
         }
     }
-}
-@OptIn(ExperimentalMaterialApi::class)
-@Composable
-fun MainScreen(isDarkTheme: Boolean, onThemeChange: (Boolean) -> Unit) {
-    val scaffoldState = rememberScaffoldState()
-    val coroutineScope = rememberCoroutineScope()
 
-    Surface(color = MaterialTheme.colors.background) {
-        Scaffold(
-            scaffoldState = scaffoldState,
-            backgroundColor = MaterialTheme.colors.background,
-            drawerShape = customShape(),
-            topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(id = R.string.app_name)) },
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            coroutineScope.launch {
-                                if (scaffoldState.drawerState.isOpen) {
-                                    scaffoldState.drawerState.close()
-                                } else {
-                                    scaffoldState.drawerState.open()
-                                }
-                            }
-                        }) {
-                            Icon(Icons.Filled.Menu, contentDescription = "Open drawer")
-                        }
-                    },
-                    actions = {
-                        Icon(
-                            imageVector = if (isDarkTheme) Icons.Filled.NightsStay else Icons.Filled.WbSunny,
-                            contentDescription = "Theme switch"
-                        )
-                        Switch(
-                            checked = isDarkTheme,
-                            onCheckedChange = onThemeChange,
-                            modifier = Modifier.padding(end = 16.dp)
-                        )
-                        if (isDarkTheme) {
-                            Toast.makeText(
-                                LocalContext.current,
-                                "Dark theme is enabled",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            //print log isDarkTheme
-                            Log.d("isDarkTheme", isDarkTheme.toString())
+    @Composable
+    fun TopBar(
+        isDarkTheme: Boolean,
+        onDarkModeChange: (Boolean) -> Unit = {},
+        drawerState: DrawerState
+    ) {
+
+        val scope = rememberCoroutineScope()
+        TopAppBar(
+            title = {
+                Column {
+                    Text("Material File Xplorer")
+                    Divider()
+                }
+            },
+            navigationIcon = {
+                IconButton(onClick = {
+                    scope.launch {
+                        if (drawerState.isClosed) {
+                            drawerState.open()
                         } else {
-                            Toast.makeText(
-                                LocalContext.current,
-                                "Light theme is enabled",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            //print log isDarkTheme
-                            Log.d("isDarkTheme", isDarkTheme.toString())
+                            drawerState.close()
                         }
                     }
+                }) {
+                    Icon(
+                        imageVector = Icons.Filled.Menu,
+                        contentDescription = "Open Drawer"
+                    )
+                }
+            },
+            actions = {
+                Icon (
+                    imageVector = if (isDarkTheme) Icons.Filled.NightsStay else Icons.Filled.WbSunny,
+                    contentDescription = "Toggle Light/Dark Mode"
                 )
-            },
-            drawerContent = {
-
-                Box(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .width(200.dp) // Set the width
-                        .height(400.dp) // Set the height
-                ) {
-                    Column {
-                        //add close button to drawer
-                        IconButton(onClick = {
-                            coroutineScope.launch {
-                                if (scaffoldState.drawerState.isOpen) {
-                                    scaffoldState.drawerState.close()
-                                } else {
-                                    scaffoldState.drawerState.open()
-                                }
-                            }
-                        }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Close drawer")
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Divider()
-                        LazyColumn {
-                            items(listOf("All Files", "Photos", "Videos")) { item ->
-                                ListItem(
-                                    text = { Text(text = item, style = MaterialTheme.typography.h6) },
-                                    icon = {
-                                        when (item) {
-                                            "All Files" -> Icon(Icons.Filled.Folder, contentDescription = "This tab shows all files in the device")
-                                            "Photos" -> Icon(Icons.Filled.Photo, contentDescription = "This tab shows all photos in the device")
-                                            "Videos" -> Icon(Icons.Filled.VideoLibrary, contentDescription = "This tab shows all videos in the device")
-                                        }
-                                    },
-                                    modifier = Modifier.clickable {
-                                        when (item) {
-                                            "All Files" -> {
-                                                Log.d("ListItemClick", "All Files clicked")
-                                            }
-                                            "Photos" -> {
-                                                Log.d("ListItemClick", "Photos clicked")
-                                            }
-                                            "Videos" -> {
-                                                Log.d("ListItemClick", "Videos clicked")
-                                            }
-                                        }
-                                    }
-                                )
-                                Divider()
-                            }
-                        }
-                    }
-                }
-            },
-            content = { paddingValues ->
-                //set Box color to surface color
-                Box(
-                    modifier = Modifier
-                        .padding(paddingValues)
-                        .background(MaterialTheme.colors.surface) // Change this line
-                ){
-                    Column(
-                        modifier = Modifier.padding(paddingValues)
-                    ) {
-                        Text(
-                            text = "Hello, World!",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.h6
-                        )
-                    }
-                }
+                Switch(
+                    checked = isDarkTheme,
+                    onCheckedChange = onDarkModeChange
+                )
             }
         )
     }
+
+    @OptIn(ExperimentalMaterialApi::class)
+    @Composable
+    fun Content(scaffoldPadding: PaddingValues) {
+        val files by fileViewModel.files.observeAsState(emptyList())
+        val context = LocalContext.current
+
+        LazyColumn(
+            contentPadding = scaffoldPadding,
+            modifier = Modifier.padding(16.dp)
+        ) {
+            items(files) { file ->
+                ListItem(
+                    text = { Text(file.name) },
+                    modifier = Modifier.clickable {
+                        if (file.isDirectory) {
+                            fileViewModel.loadFiles(file)
+                        } else {
+                            // Open the file using an Intent
+                            val intent = Intent(Intent.ACTION_VIEW)
+                            intent.data = Uri.fromFile(file)
+                            context.startActivity(intent)
+                        }
+                    },
+                    trailing = {
+                        if (!file.isDirectory) {
+                            IconButton(onClick = {
+                                val destination = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), file.name)
+                                Files.copy(file.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Download,
+                                    contentDescription = "Download"
+                                )
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    @Composable
+    fun DrawerSheet(drawerState: DrawerState) {
+        val scope = rememberCoroutineScope()
+        ModalDrawerSheet {
+            NavigationDrawerItem (
+                icon = { Icon(Icons.Filled.Close, contentDescription = "Close Drawer") },
+                label = { Text("Close Drawer") },
+                selected = false,
+                onClick = {
+                    scope.launch {
+                        drawerState.close()
+                    }
+                },
+            )
+
+            Divider()
+
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Filled.Folder, contentDescription = "All Files") },
+                label = { Text("All Files") },
+                selected = false,
+                onClick = {
+                    fileViewModel.loadFiles(Environment.getExternalStorageDirectory())
+                    scope.launch {
+                        drawerState.close()
+                    }
+                },
+            )
+
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Filled.VideoLibrary, contentDescription = "Videos") },
+                label = { Text("Videos") },
+                selected = false,
+                onClick = {
+                    fileViewModel.loadFilesWithExtension(Environment.getExternalStorageDirectory(), ".mp4")
+                    scope.launch {
+                        drawerState.close()
+                    }
+                },
+            )
+
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Filled.Photo, contentDescription = "Photos") },
+                label = { Text("Photos") },
+                selected = false,
+                onClick = {
+                    fileViewModel.loadFilesWithExtension(Environment.getExternalStorageDirectory(), ".jpg")
+                    scope.launch {
+                        drawerState.close()
+                    }
+                },
+            )
+
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Filled.Download, contentDescription = "Downloads") },
+                label = { Text("Downloads") },
+                selected = false,
+                onClick = {
+                    fileViewModel.loadFilesWithExtension(Environment.getExternalStorageDirectory(), ".apk")
+                    scope.launch {
+                        drawerState.close()
+                    }
+                },
+            )
+        }
+    }
+
+    @Composable
+    fun MaterialFileXplorerTheme(
+        isInDarkTheme: Boolean,
+        content: @Composable () -> Unit,
+    ) {
+        val colors = if (isInDarkTheme) darkColorScheme() else lightColorScheme()
+
+        val backgroundColor by animateColorAsState(targetValue = colors.background, label = "")
+        val primaryColor by animateColorAsState(targetValue = colors.primary, label = "")
+        val secondaryColor by animateColorAsState(targetValue = colors.secondary, label = "")
+
+        val animatedColors = colors.copy(background = backgroundColor, primary = primaryColor, secondary = secondaryColor)
+
+        MaterialTheme(
+            colorScheme = animatedColors,
+            shapes = Shapes(),
+            content = content
+        )
+    }
+
 }
+
+
