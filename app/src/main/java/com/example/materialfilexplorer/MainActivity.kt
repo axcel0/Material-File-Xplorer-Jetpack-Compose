@@ -3,6 +3,7 @@ package com.example.materialfilexplorer
 
 import androidx.compose.material.ListItem
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -36,6 +37,7 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 import java.io.File
 import java.nio.file.Files
@@ -55,7 +57,7 @@ class MainActivity : ComponentActivity() {
         return if (keyCode == KeyEvent.KEYCODE_BACK) {
             val currentDirectory = fileViewModel.currentDirectory.value
             if (currentDirectory?.parentFile != null) {
-                fileViewModel.loadFiles(currentDirectory.parentFile!!)
+                fileViewModel.loadDirectory(currentDirectory.parentFile!!)
             } else {
                 finish()
             }
@@ -68,25 +70,43 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         onBackPressedDispatcher.addCallback(this) {
-            val currentDirectory = fileViewModel.currentDirectory.value
-            if (currentDirectory?.parentFile != null) {
-                fileViewModel.loadFiles(currentDirectory.parentFile!!)
-            } else {
-                finish()
-            }
-        }
-        val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            if (permissions.all { it.value }) {
-                fileViewModel.loadFiles(Environment.getExternalStorageDirectory())
-            } else {
-                Toast.makeText(this, "Permissions denied", Toast.LENGTH_SHORT).show()
-            }
-        }
+            if (!fileViewModel.directoryStack.empty()) {
+                fileViewModel.loadDirectory(null)
 
-        requestPermissionLauncher.launch(arrayOf(
-            android.Manifest.permission.READ_EXTERNAL_STORAGE,
-            android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-        ))
+            } else {
+                if (packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
+                    // App is running on TV, show a confirmation dialog before exiting
+                    MaterialAlertDialogBuilder(this@MainActivity)
+                        .setTitle("Exit")
+                        .setMessage("Are you sure you want to exit?")
+                        .setPositiveButton("Yes") { _, _ ->
+                            finish()
+                        }
+                        .setNegativeButton("No") { _, _ -> }
+                        .show()
+                } else {
+                    finish()
+                }
+            }
+        }
+        if (packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
+            // App is running on TV, load the directory without asking for permissions
+            fileViewModel.loadDirectory(Environment.getExternalStorageDirectory())
+        } else {
+            // App is not running on TV, request permissions as usual
+            val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+                if (permissions.all { it.value }) {
+                    fileViewModel.loadDirectory(Environment.getExternalStorageDirectory())
+                } else {
+                    Toast.makeText(this, "Permissions denied", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            requestPermissionLauncher.launch(arrayOf(
+                android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ))
+        }
         setContent {
             var isDarkTheme by remember { mutableStateOf(sharedPreferences.getBoolean(DARK_MODE_PREF, false)) }
             val onDarkModeChange : (Boolean) -> Unit = {
@@ -107,7 +127,7 @@ class MainActivity : ComponentActivity() {
             drawerState = drawerState,
         ) {
             Scaffold (
-                topBar = { TopBar(isDarkTheme, onDarkModeChange, drawerState) },
+                topBar = { TopBar(isDarkTheme, onDarkModeChange, drawerState, fileViewModel) },
                 content = { innerPadding -> Content(innerPadding) },
             )
         }
@@ -117,14 +137,16 @@ class MainActivity : ComponentActivity() {
     fun TopBar(
         isDarkTheme: Boolean,
         onDarkModeChange: (Boolean) -> Unit = {},
-        drawerState: DrawerState
+        drawerState: DrawerState,
+        fileViewModel: FileViewModel
     ) {
-
+        val currentPath by fileViewModel.currentPath.observeAsState("/")
         val scope = rememberCoroutineScope()
         TopAppBar(
             title = {
                 Column {
                     Text("Material File Xplorer")
+                    Text("Current path: $currentPath")
                     Divider()
                 }
             },
@@ -172,7 +194,7 @@ class MainActivity : ComponentActivity() {
                     text = { Text(file.name) },
                     modifier = Modifier.clickable {
                         if (file.isDirectory) {
-                            fileViewModel.loadFiles(file)
+                            fileViewModel.loadDirectory(file)
                         } else {
                             // Open the file using an Intent
                             val intent = Intent(Intent.ACTION_VIEW)
@@ -220,7 +242,7 @@ class MainActivity : ComponentActivity() {
                 label = { Text("All Files") },
                 selected = false,
                 onClick = {
-                    fileViewModel.loadFiles(Environment.getExternalStorageDirectory())
+                    fileViewModel.loadDirectory(Environment.getExternalStorageDirectory())
                     scope.launch {
                         drawerState.close()
                     }
