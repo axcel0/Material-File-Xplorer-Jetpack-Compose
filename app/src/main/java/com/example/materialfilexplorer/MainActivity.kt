@@ -1,4 +1,5 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+
 package com.example.materialfilexplorer
 
 import androidx.compose.material.ListItem
@@ -20,8 +21,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.SnackbarDefaults.backgroundColor
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
@@ -35,6 +39,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -120,15 +125,32 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
+    fun CurrentPathSection(fileViewModel: FileViewModel) {
+        val currentPath by fileViewModel.currentPath.observeAsState("/")
+        Text(
+            text = currentPath,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+
+    @Composable
     fun MainContent(isDarkTheme: Boolean, onDarkModeChange: (Boolean) -> Unit = {}, fileViewModel: FileViewModel) {
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+        val contentView by lazy { ContentView(fileViewModel) }
+
         ModalNavigationDrawer(
             drawerContent = { DrawerSheet(drawerState) },
             drawerState = drawerState,
         ) {
             Scaffold (
                 topBar = { TopBar(isDarkTheme, onDarkModeChange, drawerState, fileViewModel) },
-                content = { innerPadding -> Content(innerPadding) },
+                content = { innerPadding ->
+                    Column {
+                        CurrentPathSection(fileViewModel)
+                        contentView.Content(innerPadding)
+                    }
+                },
             )
         }
     }
@@ -140,16 +162,9 @@ class MainActivity : ComponentActivity() {
         drawerState: DrawerState,
         fileViewModel: FileViewModel
     ) {
-        val currentPath by fileViewModel.currentPath.observeAsState("/")
         val scope = rememberCoroutineScope()
         TopAppBar(
-            title = {
-                Column {
-                    Text("Material File Xplorer")
-                    Text("Current path: $currentPath")
-                    Divider()
-                }
-            },
+            title = { Text("Material File Xplorer") },
             navigationIcon = {
                 IconButton(onClick = {
                     scope.launch {
@@ -177,47 +192,6 @@ class MainActivity : ComponentActivity() {
                 )
             }
         )
-    }
-
-    @OptIn(ExperimentalMaterialApi::class)
-    @Composable
-    fun Content(scaffoldPadding: PaddingValues) {
-        val files by fileViewModel.files.observeAsState(emptyList())
-        val context = LocalContext.current
-
-        LazyColumn(
-            contentPadding = scaffoldPadding,
-            modifier = Modifier.padding(16.dp)
-        ) {
-            items(files) { file ->
-                ListItem(
-                    text = { Text(file.name) },
-                    modifier = Modifier.clickable {
-                        if (file.isDirectory) {
-                            fileViewModel.loadDirectory(file)
-                        } else {
-                            // Open the file using an Intent
-                            val intent = Intent(Intent.ACTION_VIEW)
-                            intent.data = Uri.fromFile(file)
-                            context.startActivity(intent)
-                        }
-                    },
-                    trailing = {
-                        if (!file.isDirectory) {
-                            IconButton(onClick = {
-                                val destination = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), file.name)
-                                Files.copy(file.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Filled.Download,
-                                    contentDescription = "Download"
-                                )
-                            }
-                        }
-                    }
-                )
-            }
-        }
     }
 
     @Composable
