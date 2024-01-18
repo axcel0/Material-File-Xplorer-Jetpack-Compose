@@ -5,6 +5,7 @@ import androidx.compose.material.ListItem
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.DropdownMenuItem
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -45,9 +47,15 @@ class ContentView(private val fileViewModel: FileViewModel) {
         val context = LocalContext.current
         var isGridView by remember { mutableStateOf(false) }
         var sortType by remember { mutableStateOf("name") }
-        val sortOrder by remember { mutableStateOf("ascending") }
+        var sortOrder by remember { mutableStateOf("ascending") }
         val sortedFiles = files.sortBy(sortType, sortOrder)
         var expanded by remember { mutableStateOf(false) }
+        val currentDirectory by fileViewModel.currentDirectory.observeAsState()
+        val selectedFiles = fileViewModel.getSelectedFiles()
+
+        // Count the selected files
+        val count = fileViewModel.countSelectedFiles()
+
         Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -83,6 +91,43 @@ class ContentView(private val fileViewModel: FileViewModel) {
                                     "Sort by type" -> "type"
                                     "Sort by directory" -> "isDirectory"
                                     else -> "name"
+                                }
+                                sortOrder = if (sortOrder == "ascending") "descending" else "ascending"
+                            }) {
+                                Text(text = item)
+                            }
+                        }
+                    }
+                    var moreVertExpanded by remember { mutableStateOf(false) }
+
+                    IconButton(onClick = { moreVertExpanded = !moreVertExpanded }) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "More"
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = moreVertExpanded,
+                        onDismissRequest = { moreVertExpanded = false }
+                    ) {
+                        val list = listOf("Copy", "Delete", "Move", "Select All")
+                        list.forEach { item ->
+                            DropdownMenuItem(onClick = {
+                                moreVertExpanded = false
+                                when (item) {
+                                    "Copy" -> {
+                                        Toast.makeText(context, "Copied $count files", Toast.LENGTH_SHORT).show()
+                                    }
+                                    "Delete" -> {
+                                        Toast.makeText(context, "Deleted $count files", Toast.LENGTH_SHORT).show()
+                                    }
+                                    "Move" -> {
+                                        Toast.makeText(context, "Moved $count files", Toast.LENGTH_SHORT).show()
+                                    }
+                                    "Select All" -> {
+
+                                    }
                                 }
                             }) {
                                 Text(text = item)
@@ -130,6 +175,8 @@ class ContentView(private val fileViewModel: FileViewModel) {
     @OptIn(ExperimentalMaterialApi::class)
     @Composable
     fun FileItem(file: File, context: Context, fileViewModel: FileViewModel, isGridView: Boolean) {
+        var isSelected by remember { mutableStateOf(false) }
+
         ListItem(
             text = {
                 if (isGridView) {
@@ -157,6 +204,13 @@ class ContentView(private val fileViewModel: FileViewModel) {
                 }
             },
             trailing = {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = {
+                        isSelected = it
+                        fileViewModel.selectFile(file, isSelected)
+                    }
+                )
                 if (!file.isDirectory) {
                     IconButton(onClick = {
                         val destination = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), file.name)

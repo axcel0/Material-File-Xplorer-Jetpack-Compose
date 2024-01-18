@@ -2,10 +2,7 @@
 
 package com.example.materialfilexplorer
 
-import androidx.compose.material.ListItem
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.view.KeyEvent
@@ -16,16 +13,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.SnackbarDefaults.backgroundColor
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
@@ -33,20 +23,16 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
-import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 class MainActivity : ComponentActivity() {
 
@@ -112,6 +98,22 @@ class MainActivity : ComponentActivity() {
                 android.Manifest.permission.WRITE_EXTERNAL_STORAGE
             ))
         }
+        fileViewModel.currentPath.observe(this) {
+            title = it
+        }
+        fileViewModel.currentDirectory.observe(this) {
+            if (it != null) {
+                title = it.name
+            }
+        }
+        fileViewModel.selectedFiles.observe(this) {
+            title = if (it.isNotEmpty()) {
+                "${it.size} selected"
+            } else {
+                fileViewModel.currentPath.value
+            }
+        }
+
         setContent {
             var isDarkTheme by remember { mutableStateOf(sharedPreferences.getBoolean(DARK_MODE_PREF, false)) }
             val onDarkModeChange : (Boolean) -> Unit = {
@@ -144,7 +146,7 @@ class MainActivity : ComponentActivity() {
             drawerState = drawerState,
         ) {
             Scaffold (
-                topBar = { TopBar(isDarkTheme, onDarkModeChange, drawerState, fileViewModel) },
+                topBar = { TopBar(isDarkTheme, onDarkModeChange, drawerState) },
                 content = { innerPadding ->
                     Column {
                         CurrentPathSection(fileViewModel)
@@ -159,8 +161,7 @@ class MainActivity : ComponentActivity() {
     fun TopBar(
         isDarkTheme: Boolean,
         onDarkModeChange: (Boolean) -> Unit = {},
-        drawerState: DrawerState,
-        fileViewModel: FileViewModel
+        drawerState: DrawerState
     ) {
         val scope = rememberCoroutineScope()
         TopAppBar(
@@ -182,6 +183,14 @@ class MainActivity : ComponentActivity() {
                 }
             },
             actions = {
+                IconButton(onClick = {
+                    fileViewModel.searchFiles("query")
+                }) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = "Search"
+                    )
+                }
                 Icon (
                     imageVector = if (isDarkTheme) Icons.Filled.NightsStay else Icons.Filled.WbSunny,
                     contentDescription = "Toggle Light/Dark Mode"
