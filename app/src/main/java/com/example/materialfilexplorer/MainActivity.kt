@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
 
 package com.example.materialfilexplorer
 
@@ -15,6 +15,8 @@ import androidx.activity.viewModels
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -30,9 +32,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusState
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
+
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.isSystemInDarkTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -146,7 +156,7 @@ class MainActivity : ComponentActivity() {
             drawerState = drawerState,
         ) {
             Scaffold (
-                topBar = { TopBar(isDarkTheme, onDarkModeChange, drawerState) },
+                topBar = { TopBar(isDarkTheme, onDarkModeChange, drawerState, fileViewModel) },
                 content = { innerPadding ->
                     Column {
                         CurrentPathSection(fileViewModel)
@@ -157,15 +167,49 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun TopBar(
         isDarkTheme: Boolean,
         onDarkModeChange: (Boolean) -> Unit = {},
-        drawerState: DrawerState
+        drawerState: DrawerState,
+        fileViewModel: FileViewModel
     ) {
         val scope = rememberCoroutineScope()
+        var isSearchActive by remember { mutableStateOf(false) }
+        var searchQuery by remember { mutableStateOf("") }
+        val focusManager = LocalFocusManager.current
+
         TopAppBar(
-            title = { Text("Material File Xplorer") },
+            title = {
+                if (isSearchActive) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { newValue ->
+                            searchQuery = newValue
+                            if (searchQuery.isNotEmpty()) {
+                                fileViewModel.searchFiles(searchQuery)
+                            } else {
+                                fileViewModel.loadDirectory(fileViewModel.currentDirectory.value)
+                            }
+                        },
+                        placeholder = { Text("Search") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = {
+                            isSearchActive = false
+                            focusManager.clearFocus()
+                        }),
+                        modifier = Modifier.onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
+                                isSearchActive = true
+                            }
+                        }
+                    )
+                } else {
+                    Text("Material File Xplorer", style = MaterialTheme.typography.bodyMedium)
+                }
+            },
             navigationIcon = {
                 IconButton(onClick = {
                     scope.launch {
@@ -184,7 +228,10 @@ class MainActivity : ComponentActivity() {
             },
             actions = {
                 IconButton(onClick = {
-                    fileViewModel.searchFiles("query")
+                    isSearchActive = !isSearchActive
+                    if (isSearchActive) {
+                        fileViewModel.searchFiles(searchQuery)
+                    }
                 }) {
                     Icon(
                         imageVector = Icons.Filled.Search,
@@ -202,7 +249,6 @@ class MainActivity : ComponentActivity() {
             }
         )
     }
-
     @Composable
     fun DrawerSheet(drawerState: DrawerState) {
         val scope = rememberCoroutineScope()
@@ -225,7 +271,7 @@ class MainActivity : ComponentActivity() {
                 label = { Text("All Files") },
                 selected = false,
                 onClick = {
-                    fileViewModel.loadDirectory(Environment.getExternalStorageDirectory())
+
                     scope.launch {
                         drawerState.close()
                     }
@@ -237,7 +283,7 @@ class MainActivity : ComponentActivity() {
                 label = { Text("Videos") },
                 selected = false,
                 onClick = {
-                    fileViewModel.loadFilesWithExtension(Environment.getExternalStorageDirectory(), ".mp4")
+                    FileViewModel().loadFilesWithExtension(Environment.getExternalStorageDirectory(), ".mp4")
                     scope.launch {
                         drawerState.close()
                     }
@@ -249,7 +295,7 @@ class MainActivity : ComponentActivity() {
                 label = { Text("Photos") },
                 selected = false,
                 onClick = {
-                    fileViewModel.loadFilesWithExtension(Environment.getExternalStorageDirectory(), ".jpg")
+                    FileViewModel().loadFilesWithExtension(Environment.getExternalStorageDirectory(), ".jpg")
                     scope.launch {
                         drawerState.close()
                     }
@@ -261,7 +307,7 @@ class MainActivity : ComponentActivity() {
                 label = { Text("Downloads") },
                 selected = false,
                 onClick = {
-                    fileViewModel.loadFilesWithExtension(Environment.getExternalStorageDirectory(), ".apk")
+                    FileViewModel().loadDirectory(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS))
                     scope.launch {
                         drawerState.close()
                     }
@@ -272,7 +318,7 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun MaterialFileXplorerTheme(
-        isInDarkTheme: Boolean,
+        isInDarkTheme: Boolean = isSystemInDarkTheme(),
         content: @Composable () -> Unit,
     ) {
         val colors = if (isInDarkTheme) darkColorScheme() else lightColorScheme()

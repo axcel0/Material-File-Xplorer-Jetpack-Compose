@@ -2,9 +2,6 @@ package com.example.materialfilexplorer
 
 import android.content.Context
 import android.widget.Toast
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -18,7 +15,6 @@ class FileViewModel : ViewModel() {
     val directoryStack = Stack<File>()
     private val _currentPath: MutableLiveData<String> = MutableLiveData("/")
     val currentPath: LiveData<String> = _currentPath
-
     // This set will hold all selected files
     private val _selectedFiles = MutableLiveData<Set<File>>(emptySet())
     val selectedFiles: LiveData<Set<File>> = _selectedFiles
@@ -58,15 +54,6 @@ class FileViewModel : ViewModel() {
         }
     }
 
-    fun createFile(context: Context, fileName: String) {
-        val currentDirectory = currentDirectory.value
-        val newFile = File(currentDirectory, fileName)
-        if (newFile.exists()) {
-            Toast.makeText(context, "File already exists", Toast.LENGTH_SHORT).show()
-        } else {
-            newFile.createNewFile()
-        }
-    }
 
     fun loadFilesWithExtension(directory: File, extension: String) {
         val filteredFiles = directory.listFiles { _, name -> name.endsWith(extension, ignoreCase = true) }?.toList()
@@ -75,20 +62,31 @@ class FileViewModel : ViewModel() {
     }
 
     fun searchFiles(query: String) {
-        val currentFiles = files.value
-        val filteredFiles = currentFiles?.filter { it.name.contains(query, ignoreCase = true) }
+        val currentFiles = files.value ?: return
+        val filteredFiles = currentFiles.filterTo(mutableListOf()) { it.name.contains(query, ignoreCase = true) }
         (files as MutableLiveData).value = filteredFiles
     }
 
-    fun copyFiles(source: File, destination: File) {
-        source.copyTo(destination, overwrite = true)
+    fun copyFiles(source: Set<File>, destination: File) {
+        source.forEach {
+            val destinationFile = File(destination, it.name)
+            it.copyTo(destinationFile, overwrite = true)
+        }
+    }
+    fun pasteFiles(source: Set<File>, destination: File) {
+        source.forEach {
+            val destinationFile = File(destination, it.name)
+            it.copyTo(destinationFile, overwrite = true)
+            it.delete() // delete the source file after copying
+        }
     }
 
-    fun moveFiles(source: File, destination: File) {
-        source.copyTo(destination, overwrite = true)
-        source.delete()
+    fun moveFiles(source: Set<File>, destination: File) {
+        source.forEach {
+            val destinationFile = File(destination, it.name)
+            it.renameTo(destinationFile)
+        }
     }
-
 
     // Function to check if a file is selected
     fun isSelected(file: File): Boolean {
@@ -100,8 +98,10 @@ class FileViewModel : ViewModel() {
         source.renameTo(destination)
     }
 
-    fun deleteFiles(source: File) {
-        source.delete()
+    fun deleteFiles(source: Set<File>) {
+        source.forEach {
+            it.deleteRecursively()
+        }
     }
 
     // Function to select or deselect a file
@@ -116,9 +116,8 @@ class FileViewModel : ViewModel() {
     }
 
     // Function to select all files
-    fun selectAllFiles() {
-        val newSet = files.value?.toMutableSet() ?: mutableSetOf()
-        _selectedFiles.value = newSet
+    fun selectAllFiles(sortedFiles: List<File>) {
+        _selectedFiles.value = sortedFiles.toSet()
     }
 
     fun countSelectedFiles(): Int {
@@ -128,16 +127,7 @@ class FileViewModel : ViewModel() {
     fun clearSelectedFiles() {
         _selectedFiles.value = emptySet()
     }
-    fun addSelectedFiles(file: File) {
-        val newSet = _selectedFiles.value?.toMutableSet() ?: mutableSetOf()
-        newSet.add(file)
-        _selectedFiles.value = newSet
-    }
-    fun removeSelectedFiles(file: File) {
-        val newSet = _selectedFiles.value?.toMutableSet() ?: mutableSetOf()
-        newSet.remove(file)
-        _selectedFiles.value = newSet
-    }
+
     fun getSelectedFiles(): Set<File> {
         return _selectedFiles.value ?: emptySet()
     }

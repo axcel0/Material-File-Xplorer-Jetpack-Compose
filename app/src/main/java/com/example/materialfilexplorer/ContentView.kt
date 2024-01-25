@@ -5,7 +5,6 @@ import androidx.compose.material.ListItem
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -36,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -51,10 +51,8 @@ class ContentView(private val fileViewModel: FileViewModel) {
         val sortedFiles = files.sortBy(sortType, sortOrder)
         var expanded by remember { mutableStateOf(false) }
         val currentDirectory by fileViewModel.currentDirectory.observeAsState()
-        val selectedFiles = fileViewModel.getSelectedFiles()
+        val selectedFiles = fileViewModel.selectedFiles.value ?: emptySet()
 
-        // Count the selected files
-        val count = fileViewModel.countSelectedFiles()
 
         Column {
             Row(
@@ -111,22 +109,54 @@ class ContentView(private val fileViewModel: FileViewModel) {
                         expanded = moreVertExpanded,
                         onDismissRequest = { moreVertExpanded = false }
                     ) {
-                        val list = listOf("Copy", "Delete", "Move", "Select All")
+                        val list = listOf("Create", "Copy", "Paste", "Delete", "Move", "Select All", "Cancel")
                         list.forEach { item ->
                             DropdownMenuItem(onClick = {
                                 moreVertExpanded = false
                                 when (item) {
-                                    "Copy" -> {
-                                        Toast.makeText(context, "Copied $count files", Toast.LENGTH_SHORT).show()
+                                    "Create" -> {
+                                        MaterialAlertDialogBuilder(context)
+                                            .setTitle("Create")
+                                            .setPositiveButton("Create") { _, _ ->
+                                                fileViewModel.createDirectory(context, "New Folder")
+                                            }
+                                            .setNegativeButton("Cancel") { dialog, _ ->
+                                                dialog.dismiss()
+                                            }
+                                            .show()
                                     }
-                                    "Delete" -> {
-                                        Toast.makeText(context, "Deleted $count files", Toast.LENGTH_SHORT).show()
+                                    "Copy"
+                                    -> {
+                                        fileViewModel.copyFiles(selectedFiles, currentDirectory!!)
                                     }
-                                    "Move" -> {
-                                        Toast.makeText(context, "Moved $count files", Toast.LENGTH_SHORT).show()
+                                    "Paste"
+                                    -> {
+                                        fileViewModel.pasteFiles(selectedFiles, currentDirectory!!)
                                     }
-                                    "Select All" -> {
-
+                                    "Delete"
+                                    -> {
+                                        MaterialAlertDialogBuilder(context)
+                                            .setTitle("Delete")
+                                            .setMessage("Are you sure you want to delete the selected files?")
+                                            .setPositiveButton("Delete") { _, _ ->
+                                                fileViewModel.deleteFiles(selectedFiles)
+                                            }
+                                            .setNegativeButton("Cancel") { dialog, _ ->
+                                                dialog.dismiss()
+                                            }
+                                            .show()
+                                    }
+                                    "Move"
+                                    -> {
+                                        fileViewModel.moveFiles(selectedFiles, currentDirectory!!)
+                                    }
+                                    "Select All"
+                                    -> {
+                                        fileViewModel.selectAllFiles(sortedFiles)
+                                    }
+                                    "Cancel"
+                                    -> {
+                                        fileViewModel.clearSelectedFiles()
                                     }
                                 }
                             }) {
