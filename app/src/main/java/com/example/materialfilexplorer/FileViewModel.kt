@@ -30,11 +30,9 @@ class FileViewModel : ViewModel() {
             (files as MutableLiveData).value = directory.listFiles()?.toList()
             (currentDirectory as MutableLiveData).value = directory
         } else {
-            if (directoryStack.size > 1) {
-                val parentDirectory = directoryStack.pop().parentFile
-                directoryStack.clear()
+            if (directoryStack.isNotEmpty()) {
+                val parentDirectory = directoryStack.pop()
                 if (parentDirectory != null) {
-                    directoryStack.push(parentDirectory)
                     _currentPath.value = directoryStack.joinToString(separator = "/") { it.name }
                     loadDirectory(parentDirectory)
                 } else {
@@ -43,7 +41,6 @@ class FileViewModel : ViewModel() {
             }
         }
     }
-
     fun createDirectory(context: Context, directoryName: String) {
         val currentDirectory = currentDirectory.value
         val newDirectory = File(currentDirectory, directoryName)
@@ -116,8 +113,8 @@ class FileViewModel : ViewModel() {
     }
 
     // Function to select all files
-    fun selectAllFiles(sortedFiles: List<File>) {
-        _selectedFiles.value = sortedFiles.toSet()
+    fun selectAllFiles() {
+        _selectedFiles.value = files.value?.toSet()
     }
 
     fun countSelectedFiles(): Int {

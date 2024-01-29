@@ -5,6 +5,7 @@ import androidx.compose.material.ListItem
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.DropdownMenuItem
+import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,6 +35,7 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -152,7 +155,7 @@ class ContentView(private val fileViewModel: FileViewModel) {
                                     }
                                     "Select All"
                                     -> {
-                                        fileViewModel.selectAllFiles(sortedFiles)
+                                        fileViewModel.selectAllFiles()
                                     }
                                     "Cancel"
                                     -> {
@@ -210,9 +213,9 @@ class ContentView(private val fileViewModel: FileViewModel) {
         ListItem(
             text = {
                 if (isGridView) {
-                    Text(file.name, fontSize = 20.sp)
+                    Text(file.name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 } else {
-                    Text(file.name)
+                    Text(file.name, fontWeight = FontWeight.Bold)
                 }
             },
             icon = {
@@ -222,17 +225,26 @@ class ContentView(private val fileViewModel: FileViewModel) {
                     } else {
                         Icon(imageVector = Icons.Filled.Folder, contentDescription = "Folder", tint = Color(0xFFFFA400))
                     }
-                }
-            },
-            modifier = Modifier.clickable {
-                if (file.isDirectory) {
-                    fileViewModel.loadDirectory(file)
                 } else {
-                    val intent = Intent(Intent.ACTION_VIEW)
-                    intent.data = Uri.fromFile(file)
-                    context.startActivity(intent)
+                    if (isGridView) {
+                        Icon(imageVector = Icons.Filled.InsertDriveFile, contentDescription = "File", modifier = Modifier.size(48.dp), tint = Color(0xFF757575))
+                    } else {
+                        Icon(imageVector = Icons.Filled.InsertDriveFile, contentDescription = "File", tint = Color(0xFF757575))
+                    }
                 }
             },
+            modifier = Modifier
+                .clickable {
+                    if (file.isDirectory) {
+                        fileViewModel.loadDirectory(file)
+                    } else {
+                        val intent = Intent(Intent.ACTION_VIEW)
+                        intent.data = Uri.fromFile(file)
+                        context.startActivity(intent)
+                    }
+                }
+                .background(if (isSelected) Color.LightGray else Color.Transparent)
+                .padding(8.dp),
             trailing = {
                 Checkbox(
                     checked = isSelected,
@@ -254,5 +266,6 @@ class ContentView(private val fileViewModel: FileViewModel) {
                 }
             }
         )
+        Divider()
     }
 }

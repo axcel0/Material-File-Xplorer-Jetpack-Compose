@@ -2,9 +2,11 @@
 
 package com.example.materialfilexplorer
 
+import android.app.ProgressDialog.show
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Environment
+import android.util.Log
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -67,27 +69,26 @@ class MainActivity : ComponentActivity() {
             super.onKeyDown(keyCode, event)
         }
     }
+
     private val fileViewModel: FileViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         onBackPressedDispatcher.addCallback(this) {
-            if (!fileViewModel.directoryStack.empty()) {
-                fileViewModel.loadDirectory(null)
-
+            val currentDirectory = fileViewModel.currentDirectory.value
+            if (currentDirectory?.parentFile != null) {
+                fileViewModel.loadDirectory(currentDirectory.parentFile!!)
             } else {
-                if (packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
-                    // App is running on TV, show a confirmation dialog before exiting
-                    MaterialAlertDialogBuilder(this@MainActivity)
-                        .setTitle("Exit")
-                        .setMessage("Are you sure you want to exit?")
-                        .setPositiveButton("Yes") { _, _ ->
-                            finish()
-                        }
-                        .setNegativeButton("No") { _, _ -> }
-                        .show()
-                } else {
-                    finish()
-                }
+                //add dialog to confirm exit
+                MaterialAlertDialogBuilder(this@MainActivity)
+                    .setTitle("Exit")
+                    .setMessage("Are you sure you want to exit?")
+                    .setPositiveButton("Yes") { _, _ ->
+                        finish()
+                    }
+                    .setNegativeButton("No") { _, _ ->
+                        // Respond to negative button press
+                    }
+                    .show()
             }
         }
         if (packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
@@ -152,7 +153,7 @@ class MainActivity : ComponentActivity() {
         val contentView by lazy { ContentView(fileViewModel) }
 
         ModalNavigationDrawer(
-            drawerContent = { DrawerSheet(drawerState) },
+            drawerContent = { DrawerSheet(drawerState)},
             drawerState = drawerState,
         ) {
             Scaffold (
