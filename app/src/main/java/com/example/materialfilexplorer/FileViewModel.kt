@@ -6,6 +6,9 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.Stack
 
 class FileViewModel : ViewModel() {
@@ -19,7 +22,7 @@ class FileViewModel : ViewModel() {
     private val _selectedFiles = MutableLiveData<Set<File>>(emptySet())
     val selectedFiles: LiveData<Set<File>> = _selectedFiles
 
-    fun loadDirectory(directory: File?) {
+    fun loadDirectory(directory: File? = File("/storage/emulated/0")) {
         if (directory != null) {
             val path = directory.absolutePath
             directoryStack.push(directory)
@@ -41,13 +44,17 @@ class FileViewModel : ViewModel() {
             }
         }
     }
-    fun createDirectory(context: Context, directoryName: String) {
-        val currentDirectory = currentDirectory.value
-        val newDirectory = File(currentDirectory, directoryName)
-        if (newDirectory.exists()) {
-            Toast.makeText(context, "Directory already exists", Toast.LENGTH_SHORT).show()
+
+    fun createItem(context: Context, name: String, isDirectory: Boolean) {
+        val currentDirectory = currentDirectory.value ?: return
+        val newFile = File(currentDirectory, name)
+        val result = if (isDirectory) newFile.mkdirs() else newFile.createNewFile()
+
+        if (result) {
+            // Refresh the files list
+            loadDirectory(currentDirectory)
         } else {
-            newDirectory.mkdir()
+            Toast.makeText(context, "Failed to create item", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -64,25 +71,58 @@ class FileViewModel : ViewModel() {
         (files as MutableLiveData).value = filteredFiles
     }
 
-    fun copyFiles(source: Set<File>, destination: File) {
-        source.forEach {
-            val destinationFile = File(destination, it.name)
-            it.copyTo(destinationFile, overwrite = true)
+    fun copyFiles(selectedFiles: Set<File>, destinationDirectory: File) {
+        selectedFiles.forEach { file ->
+            val destinationFile = File(destinationDirectory, file.name)
+            try {
+                Files.copy(file.toPath(), destinationFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
         }
+        // Refresh the files list
+        loadDirectory(destinationDirectory)
     }
-    fun pasteFiles(source: Set<File>, destination: File) {
-        source.forEach {
-            val destinationFile = File(destination, it.name)
-            it.copyTo(destinationFile, overwrite = true)
-            it.delete() // delete the source file after copying
+
+    fun deleteFiles(selectedFiles: Set<File>) {
+        selectedFiles.forEach { file ->
+            val result = file.delete()
+            if (!result) {
+                println("Failed to delete ${file.name}")
+            }
+        }
+        // Refresh the files list
+        val currentDirectory = currentDirectory.value
+        if (currentDirectory != null) {
+            loadDirectory(currentDirectory)
         }
     }
 
-    fun moveFiles(source: Set<File>, destination: File) {
+    fun pasteFiles(source: Set<File>, destination: File) {
         source.forEach {
-            val destinationFile = File(destination, it.name)
-            it.renameTo(destinationFile)
+            try {
+                val destinationFile = File(destination, it.name)
+                it.copyTo(destinationFile, overwrite = true)
+                it.delete() // delete the source file after copying
+            } catch (e: Exception) {
+                // Handle the exception here
+                println("Error pasting file: ${it.name}")
+                println("Exception: $e")
+            }
         }
+    }
+
+    fun moveFiles(selectedFiles: Set<File>, destinationDirectory: File) {
+        selectedFiles.forEach { file ->
+            val destinationFile = File(destinationDirectory, file.name)
+            try {
+                Files.move(file.toPath(), destinationFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+        }
+        // Refresh the files list
+        loadDirectory(destinationDirectory)
     }
 
     // Function to check if a file is selected
@@ -91,15 +131,16 @@ class FileViewModel : ViewModel() {
     }
 
     fun renameFiles(source: File, newName: String) {
-        val destination = File(source.parentFile, newName)
-        source.renameTo(destination)
-    }
-
-    fun deleteFiles(source: Set<File>) {
-        source.forEach {
-            it.deleteRecursively()
+        try {
+            val destinationFile = File(source.parent, newName)
+            source.renameTo(destinationFile)
+        } catch (e: Exception) {
+            // Handle the exception here
+            println("Error renaming file: ${source.name}")
+            println("Exception: $e")
         }
     }
+
 
     // Function to select or deselect a file
     fun selectFile(file: File, isSelected: Boolean) {
@@ -112,17 +153,9 @@ class FileViewModel : ViewModel() {
         _selectedFiles.value = newSet
     }
 
-    // Function to select all files
-    fun selectAllFiles() {
-        _selectedFiles.value = files.value?.toSet()
-    }
 
     fun countSelectedFiles(): Int {
         return _selectedFiles.value?.size ?: 0
-    }
-
-    fun clearSelectedFiles() {
-        _selectedFiles.value = emptySet()
     }
 
     fun getSelectedFiles(): Set<File> {

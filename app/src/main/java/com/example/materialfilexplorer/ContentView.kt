@@ -81,7 +81,7 @@ class ContentView(private val fileViewModel: FileViewModel) {
                         expanded = expanded,
                         onDismissRequest = { expanded = false }
                     ) {
-                        val list = listOf("Sort by name", "Sort by date", "Sort by size", "Sort by type", "Sort by directory")
+                        val list = listOf("Sort by name", "Sort by date", "Sort by size", "Sort by directory")
                         list.forEach { item ->
                             DropdownMenuItem(onClick = {
                                 expanded = false
@@ -89,7 +89,6 @@ class ContentView(private val fileViewModel: FileViewModel) {
                                     "Sort by name" -> "name"
                                     "Sort by date" -> "date"
                                     "Sort by size" -> "size"
-                                    "Sort by type" -> "type"
                                     "Sort by directory" -> "isDirectory"
                                     else -> "name"
                                 }
@@ -121,7 +120,7 @@ class ContentView(private val fileViewModel: FileViewModel) {
                                         MaterialAlertDialogBuilder(context)
                                             .setTitle("Create")
                                             .setPositiveButton("Create") { _, _ ->
-                                                fileViewModel.createDirectory(context, "New Folder")
+                                                fileViewModel.createItem(context, "New Folder", true)
                                             }
                                             .setNegativeButton("Cancel") { dialog, _ ->
                                                 dialog.dismiss()
@@ -155,11 +154,11 @@ class ContentView(private val fileViewModel: FileViewModel) {
                                     }
                                     "Select All"
                                     -> {
-                                        fileViewModel.selectAllFiles()
+
                                     }
                                     "Cancel"
                                     -> {
-                                        fileViewModel.clearSelectedFiles()
+
                                     }
                                 }
                             }) {
@@ -183,7 +182,7 @@ class ContentView(private val fileViewModel: FileViewModel) {
             } else {
                 LazyColumn(
                     contentPadding = scaffoldPadding,
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(20.dp)
                 ) {
                     items(sortedFiles) { file ->
                         FileItem(file = file, context = context, fileViewModel = fileViewModel, isGridView = false)
@@ -215,19 +214,19 @@ class ContentView(private val fileViewModel: FileViewModel) {
                 if (isGridView) {
                     Text(file.name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 } else {
-                    Text(file.name, fontWeight = FontWeight.Bold)
+                    Text(file.name, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
             },
             icon = {
                 if (file.isDirectory) {
                     if (isGridView) {
-                        Icon(imageVector = Icons.Filled.Folder, contentDescription = "Folder", modifier = Modifier.size(48.dp), tint = Color(0xFFFFA400))
+                        Icon(imageVector = Icons.Filled.Folder, contentDescription = "Folder", modifier = Modifier.size(56.dp), tint = Color(0xFFFFA400))
                     } else {
                         Icon(imageVector = Icons.Filled.Folder, contentDescription = "Folder", tint = Color(0xFFFFA400))
                     }
                 } else {
                     if (isGridView) {
-                        Icon(imageVector = Icons.Filled.InsertDriveFile, contentDescription = "File", modifier = Modifier.size(48.dp), tint = Color(0xFF757575))
+                        Icon(imageVector = Icons.Filled.InsertDriveFile, contentDescription = "File", modifier = Modifier.size(72.dp), tint = Color(0xFF757575))
                     } else {
                         Icon(imageVector = Icons.Filled.InsertDriveFile, contentDescription = "File", tint = Color(0xFF757575))
                     }
