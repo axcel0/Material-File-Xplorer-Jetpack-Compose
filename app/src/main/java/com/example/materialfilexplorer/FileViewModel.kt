@@ -99,17 +99,16 @@ class FileViewModel : ViewModel() {
     }
 
     fun pasteFiles(source: Set<File>, destination: File) {
-        source.forEach {
+        source.forEach { file ->
+            val destinationFile = File(destination, file.name)
             try {
-                val destinationFile = File(destination, it.name)
-                it.copyTo(destinationFile, overwrite = true)
-                it.delete() // delete the source file after copying
-            } catch (e: Exception) {
-                // Handle the exception here
-                println("Error pasting file: ${it.name}")
-                println("Exception: $e")
+                Files.copy(file.toPath(), destinationFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } catch (e: IOException) {
+                e.printStackTrace()
             }
         }
+        // Refresh the files list
+        loadDirectory(destination)
     }
 
     fun moveFiles(selectedFiles: Set<File>, destinationDirectory: File) {
