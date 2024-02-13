@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.DropdownMenuItem
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
@@ -56,7 +58,6 @@ class ContentView(private val fileViewModel: FileViewModel) {
         val currentDirectory by fileViewModel.currentDirectory.observeAsState()
         val selectedFiles = fileViewModel.selectedFiles.value ?: emptySet()
 
-
         Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -66,13 +67,13 @@ class ContentView(private val fileViewModel: FileViewModel) {
                 Row {
                     IconButton(onClick = { isGridView = !isGridView }) {
                         Icon(
-                            imageVector = if (isGridView) Icons.Filled.ViewList else Icons.Filled.ViewModule,
+                            imageVector = if (isGridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.ViewModule,
                             contentDescription = if (isGridView) "Switch to List View" else "Switch to Grid View"
                         )
                     }
                     IconButton(onClick = { expanded = true }) {
                         Icon(
-                            imageVector = Icons.Filled.Sort,
+                            imageVector = Icons.AutoMirrored.Filled.Sort,
                             contentDescription = "Sort"
                         )
                     }
@@ -129,11 +130,11 @@ class ContentView(private val fileViewModel: FileViewModel) {
                                     }
                                     "Copy"
                                     -> {
-                                        fileViewModel.copyFiles(selectedFiles, currentDirectory!!)
+                                        fileViewModel.copyFiles(context, selectedFiles, currentDirectory!!)
                                     }
                                     "Paste"
                                     -> {
-                                        fileViewModel.pasteFiles(selectedFiles, currentDirectory!!)
+                                        fileViewModel.pasteFiles(context, selectedFiles, currentDirectory!!)
                                     }
                                     "Delete"
                                     -> {
@@ -141,7 +142,7 @@ class ContentView(private val fileViewModel: FileViewModel) {
                                             .setTitle("Delete")
                                             .setMessage("Are you sure you want to delete the selected files?")
                                             .setPositiveButton("Delete") { _, _ ->
-                                                fileViewModel.deleteFiles(selectedFiles)
+                                                fileViewModel.deleteFiles(context, selectedFiles)
                                             }
                                             .setNegativeButton("Cancel") { dialog, _ ->
                                                 dialog.dismiss()
@@ -150,7 +151,7 @@ class ContentView(private val fileViewModel: FileViewModel) {
                                     }
                                     "Move"
                                     -> {
-                                        fileViewModel.moveFiles(selectedFiles, currentDirectory!!)
+                                        fileViewModel.moveFiles(context, selectedFiles, currentDirectory!!)
                                     }
                                     "Select All"
                                     -> {
@@ -235,7 +236,7 @@ class ContentView(private val fileViewModel: FileViewModel) {
             modifier = Modifier
                 .clickable {
                     if (file.isDirectory) {
-                        fileViewModel.loadDirectory(file)
+                        fileViewModel.loadInternalStorage(file)
                     } else {
                         val intent = Intent(Intent.ACTION_VIEW)
                         intent.data = Uri.fromFile(file)
@@ -265,6 +266,6 @@ class ContentView(private val fileViewModel: FileViewModel) {
                 }
             }
         )
-        Divider()
+        HorizontalDivider()
     }
 }

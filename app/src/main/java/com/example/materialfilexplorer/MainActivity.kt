@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Divider
@@ -85,13 +86,16 @@ class MainActivity : ComponentActivity() {
 //        }
 //    }
 
-    private val fileViewModel: FileViewModel by viewModels()
+    private val fileViewModel: FileViewModel by viewModels {
+        FileViewModelFactory(applicationContext)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         onBackPressedDispatcher.addCallback(this) {
             val currentDirectory = fileViewModel.currentDirectory.value
             if (currentDirectory?.parentFile != null) {
-                fileViewModel.loadDirectory(currentDirectory.parentFile!!)
+                fileViewModel.loadInternalStorage(currentDirectory.parentFile!!)
             } else {
                 //add dialog to confirm exit
                 MaterialAlertDialogBuilder(this@MainActivity)
@@ -108,12 +112,12 @@ class MainActivity : ComponentActivity() {
         }
         if (packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
             // App is running on TV, load the directory without asking for permissions
-            fileViewModel.loadDirectory(Environment.getExternalStorageDirectory())
+            fileViewModel.loadInternalStorage(Environment.getExternalStorageDirectory())
         } else {
             // App is not running on TV, request permissions as usual
             val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
                 if (permissions.all { it.value }) {
-                    fileViewModel.loadDirectory(Environment.getExternalStorageDirectory())
+                    fileViewModel.loadInternalStorage(Environment.getExternalStorageDirectory())
                 } else {
                     Toast.makeText(this, "Permissions denied", Toast.LENGTH_SHORT).show()
                 }
@@ -206,7 +210,9 @@ class MainActivity : ComponentActivity() {
                             if (searchQuery.isNotEmpty()) {
                                 fileViewModel.searchFiles(searchQuery)
                             } else {
-                                fileViewModel.loadDirectory(fileViewModel.currentDirectory.value)
+                                fileViewModel.currentDirectory.value?.let {
+                                    fileViewModel.loadInternalStorage(it)
+                                }
                             }
                         },
                         placeholder = { Text("Search") },
@@ -287,7 +293,9 @@ class MainActivity : ComponentActivity() {
                 label = { Text("All Files") },
                 selected = false,
                 onClick = {
-
+                    fileViewModel.currentDirectory.value?.let {
+                        fileViewModel.loadInternalStorage(it)
+                    }
                     scope.launch {
                         drawerState.close()
                     }
@@ -299,7 +307,10 @@ class MainActivity : ComponentActivity() {
                 label = { Text("Videos") },
                 selected = false,
                 onClick = {
-                    FileViewModel().loadFilesWithExtension(Environment.getExternalStorageDirectory(), ".mp4")
+                    fileViewModel.currentDirectory.value?.let {
+                        it.listFiles()
+                            ?.let { it1 -> fileViewModel.filterFilesByExtension(it1.toList(), listOf("mp4", "avi", "mov")) }
+                    }
                     scope.launch {
                         drawerState.close()
                     }
@@ -311,7 +322,10 @@ class MainActivity : ComponentActivity() {
                 label = { Text("Photos") },
                 selected = false,
                 onClick = {
-                    FileViewModel().loadFilesWithExtension(Environment.getExternalStorageDirectory(), ".jpg")
+                    fileViewModel.currentDirectory.value?.let {
+                        it.listFiles()
+                            ?.let { it1 -> fileViewModel.filterFilesByExtension(it1.toList(), listOf("jpg", "png", "img")) }
+                    }
                     scope.launch {
                         drawerState.close()
                     }
@@ -319,11 +333,11 @@ class MainActivity : ComponentActivity() {
             )
 
             NavigationDrawerItem(
-                icon = { Icon(Icons.Filled.Download, contentDescription = "Downloads") },
-                label = { Text("Downloads") },
+                icon = { Icon(Icons.Filled.Usb, contentDescription = "External Storage") },
+                label = { Text("External Storage") },
                 selected = false,
                 onClick = {
-                    FileViewModel().loadDirectory(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS))
+
                     scope.launch {
                         drawerState.close()
                     }

@@ -60,19 +60,19 @@ dependencies {
     implementation("androidx.tv:tv-material:1.0.0-alpha10")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
-    implementation("androidx.compose.ui:ui-tooling:1.5.4")
+    implementation("androidx.compose.ui:ui-tooling:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.compose.ui:ui:1.5.4")
-    implementation("androidx.compose.material:material:1.5.4")
-    implementation("androidx.compose.material3:material3:1.1.2")
-    implementation("androidx.navigation:navigation-compose:2.7.6")
+    implementation("androidx.compose.ui:ui:1.6.1")
+    implementation("androidx.compose.material:material:1.6.1")
+    implementation("androidx.compose.material3:material3:1.2.0")
+    implementation("androidx.navigation:navigation-compose:2.7.7")
     //implementation runtime liveData
-    implementation("androidx.compose.runtime:runtime-livedata:1.5.4")
+    implementation("androidx.compose.runtime:runtime-livedata:1.6.1")
     //lifecycle viewmodel compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     //material icons
-    implementation("androidx.compose.material:material-icons-core:1.5.4")
-    implementation("androidx.compose.material:material-icons-extended:1.5.4")
+    implementation("androidx.compose.material:material-icons-core:1.6.1")
+    implementation("androidx.compose.material:material-icons-extended:1.6.1")
     implementation("com.google.accompanist:accompanist-permissions:0.33.2-alpha")
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.33.2-alpha")
 

@@ -1,6 +1,9 @@
 package com.example.materialfilexplorer
 
 import android.content.Context
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
+import android.os.Environment
 import android.widget.Toast
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -11,7 +14,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Stack
 
-class FileViewModel : ViewModel() {
+class FileViewModel(private val appContext: Context) : ViewModel() {
 
     val files: LiveData<List<File>> = MutableLiveData()
     val currentDirectory: LiveData<File> = MutableLiveData()
@@ -22,7 +25,7 @@ class FileViewModel : ViewModel() {
     private val _selectedFiles = MutableLiveData<Set<File>>(emptySet())
     val selectedFiles: LiveData<Set<File>> = _selectedFiles
 
-    fun loadDirectory(directory: File? = File("/storage/emulated/0")) {
+    fun loadInternalStorage(directory: File? = null) {
         if (directory != null) {
             val path = directory.absolutePath
             directoryStack.push(directory)
@@ -37,7 +40,7 @@ class FileViewModel : ViewModel() {
                 val parentDirectory = directoryStack.pop()
                 if (parentDirectory != null) {
                     _currentPath.value = directoryStack.joinToString(separator = "/") { it.name }
-                    loadDirectory(parentDirectory)
+                    loadInternalStorage(parentDirectory)
                 } else {
                     _currentPath.value = "/"
                 }
@@ -45,24 +48,47 @@ class FileViewModel : ViewModel() {
         }
     }
 
+//    fun loadExternalStorage() {
+//        val externalStorageDirectory = Environment.getExternalStorageDirectory()
+//        val path = externalStorageDirectory.absolutePath
+//        directoryStack.push(externalStorageDirectory)
+//        _currentPath.value = directoryStack.joinToString(separator = "/") { it.name }
+//        if (path.contains("/Android/data") || path.contains("/Android/obb")) {
+//            return
+//        }
+//        (files as MutableLiveData).value = externalStorageDirectory.listFiles()?.toList()
+//        (currentDirectory as MutableLiveData).value = externalStorageDirectory
+//
+//    }
+
     fun createItem(context: Context, name: String, isDirectory: Boolean) {
         val currentDirectory = currentDirectory.value ?: return
-        val newFile = File(currentDirectory, name)
-        val result = if (isDirectory) newFile.mkdirs() else newFile.createNewFile()
-
-        if (result) {
-            // Refresh the files list
-            loadDirectory(currentDirectory)
+        val newItem = File(currentDirectory, name)
+        if (isDirectory) {
+            val result = newItem.mkdir()
+            if (!result) {
+                Toast.makeText(context, "Failed to create directory", Toast.LENGTH_SHORT).show()
+            }
         } else {
-            Toast.makeText(context, "Failed to create item", Toast.LENGTH_SHORT).show()
+            try {
+                val result = newItem.createNewFile()
+                if (!result) {
+                    Toast.makeText(context, "Failed to create file", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
         }
+        // Refresh the files list
+        loadInternalStorage(currentDirectory)
     }
 
-
-    fun loadFilesWithExtension(directory: File, extension: String) {
-        val filteredFiles = directory.listFiles { _, name -> name.endsWith(extension, ignoreCase = true) }?.toList()
-        (files as MutableLiveData).value = filteredFiles
-        (currentDirectory as MutableLiveData).value = directory
+    fun filterFilesByExtension(files: List<File>, extensions: List<String>): List<File> {
+        return files.filter { file ->
+            extensions.any { extension ->
+                file.extension.equals(extension, ignoreCase = true)
+            }
+        }
     }
 
     fun searchFiles(query: String) {
@@ -71,7 +97,7 @@ class FileViewModel : ViewModel() {
         (files as MutableLiveData).value = filteredFiles
     }
 
-    fun copyFiles(selectedFiles: Set<File>, destinationDirectory: File) {
+    fun copyFiles(context: Context, selectedFiles: Set<File>, destinationDirectory: File) {
         selectedFiles.forEach { file ->
             val destinationFile = File(destinationDirectory, file.name)
             try {
@@ -81,10 +107,10 @@ class FileViewModel : ViewModel() {
             }
         }
         // Refresh the files list
-        loadDirectory(destinationDirectory)
+        loadInternalStorage(destinationDirectory)
     }
 
-    fun deleteFiles(selectedFiles: Set<File>) {
+    fun deleteFiles(context: Context, selectedFiles: Set<File>) {
         selectedFiles.forEach { file ->
             val result = file.delete()
             if (!result) {
@@ -94,11 +120,11 @@ class FileViewModel : ViewModel() {
         // Refresh the files list
         val currentDirectory = currentDirectory.value
         if (currentDirectory != null) {
-            loadDirectory(currentDirectory)
+            loadInternalStorage(currentDirectory)
         }
     }
 
-    fun pasteFiles(source: Set<File>, destination: File) {
+    fun pasteFiles(context: Context, source: Set<File>, destination: File) {
         source.forEach { file ->
             val destinationFile = File(destination, file.name)
             try {
@@ -108,10 +134,10 @@ class FileViewModel : ViewModel() {
             }
         }
         // Refresh the files list
-        loadDirectory(destination)
+        loadInternalStorage(destination)
     }
 
-    fun moveFiles(selectedFiles: Set<File>, destinationDirectory: File) {
+    fun moveFiles(context: Context, selectedFiles: Set<File>, destinationDirectory: File) {
         selectedFiles.forEach { file ->
             val destinationFile = File(destinationDirectory, file.name)
             try {
@@ -121,7 +147,7 @@ class FileViewModel : ViewModel() {
             }
         }
         // Refresh the files list
-        loadDirectory(destinationDirectory)
+        loadInternalStorage(destinationDirectory)
     }
 
     // Function to check if a file is selected
